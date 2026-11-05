@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>건설현장 대시보드</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f4f2;
+  --surface-1: #fcfcfb;
+  --surface-2: #f0efec;
+  --border: #e2e1dc;
+  --grid: #e8e7e3;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7a7974;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --banner-bg: #fff4d6;
+  --banner-text: #5c4300;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121211;
+    --surface-1: #1a1a19;
+    --surface-2: #232321;
+    --border: #33332f;
+    --grid: #2c2c29;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --banner-bg: #3a2f10;
+    --banner-text: #f5dc9a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211;
+  --surface-1: #1a1a19;
+  --surface-2: #232321;
+  --border: #33332f;
+  --grid: #2c2c29;
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --banner-bg: #3a2f10;
+  --banner-text: #f5dc9a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px 48px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* 샘플 경고띠 */
+.banner {
+  background: var(--banner-bg); color: var(--banner-text);
+  padding: 8px 16px; font-size: 13px; text-align: center;
+}
+
+/* 헤더 */
+header.top { padding: 20px 0 12px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; }
+header.top h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+header.top .meta { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+.theme-btn {
+  background: var(--surface-1); color: var(--text-secondary); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer;
+}
+
+/* 공기 진행 바 */
+.timeline { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.timeline .row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--text-secondary); }
+.timeline .row b { color: var(--text-primary); font-weight: 600; }
+.track { position: relative; height: 10px; border-radius: 5px; background: var(--surface-2); margin: 10px 0 6px; overflow: hidden; }
+.track .fill { position: absolute; inset: 0 auto 0 0; background: var(--series-1); border-radius: 5px; }
+
+/* 네비 */
+nav.tabs { position: sticky; top: 0; z-index: 5; background: var(--bg); display: flex; gap: 6px; padding: 8px 0; overflow-x: auto; }
+nav.tabs a {
+  flex: 0 0 auto; text-decoration: none; color: var(--text-secondary); font-size: 13px; font-weight: 600;
+  padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-1);
+}
+nav.tabs a:hover { color: var(--text-primary); }
+
+/* 섹션 */
+section.mod { margin-top: 20px; scroll-margin-top: 56px; }
+section.mod > h2 { font-size: 17px; margin: 0 0 10px; display: flex; align-items: baseline; gap: 8px; }
+section.mod > h2 .no { color: var(--text-muted); font-weight: 600; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.tile .label { color: var(--text-secondary); font-size: 12px; }
+.tile .value { font-size: 22px; font-weight: 650; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .value small { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-left: 2px; }
+.tile .sub { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+
+.grid2 { display: grid; grid-template-columns: 3fr 2fr; gap: 10px; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px; min-width: 0; }
+.card h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.card .desc { color: var(--text-muted); font-size: 12px; margin: 2px 0 8px; }
+.chart { width: 100%; position: relative; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.legend i.line { height: 2px; width: 14px; border-radius: 1px; vertical-align: 3px; }
+
+/* 상태 배지: 아이콘 + 문자 (색상 단독 표현 금지) */
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.badge.good { --c: var(--good); }
+.badge.warn { --c: var(--warning); }
+.badge.crit { --c: var(--critical); }
+.badge.info { --c: var(--series-1); }
+.badge.muted { --c: var(--text-muted); }
+
+/* 표 */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { color: var(--text-secondary); font-weight: 600; font-size: 12px; }
+td.r, th.r { text-align: right; }
+details.tv { margin-top: 8px; }
+details.tv summary { cursor: pointer; color: var(--text-secondary); font-size: 12px; }
+
+/* 툴팁 */
+#tip {
+  position: fixed; pointer-events: none; z-index: 50; display: none;
+  background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); min-width: 140px;
+}
+#tip .t { font-weight: 600; margin-bottom: 4px; }
+#tip .r { display: flex; justify-content: space-between; gap: 12px; }
+#tip .r span:first-child { color: var(--text-secondary); }
+#tip .k { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+
+footer { color: var(--text-muted); font-size: 12px; margin-top: 28px; border-top: 1px solid var(--border); padding-top: 12px; }
+footer ol { margin: 4px 0 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+<div id="banner" class="banner" hidden>※ 샘플 데이터입니다 — 공사기간·도급액 외 모든 수치는 화면 구성용 가상값이며, 공정표·계약내역서 수령 후 교체 예정</div>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1 id="pj-name">건설현장 대시보드</h1>
+      <div class="meta" id="pj-meta"></div>
+    </div>
+    <button class="theme-btn" id="themeBtn" type="button">화면 테마 전환</button>
+  </header>
+
+  <div class="timeline" id="timeline"></div>
+
+  <nav class="tabs">
+    <a href="#sec-progress">1. 공정관리</a>
+    <a href="#sec-cost">2. 원가관리</a>
+    <a href="#sec-quality">3. 품질관리</a>
+    <a href="#sec-safety">4. 안전관리</a>
+  </nav>
+
+  <!-- 1. 공정관리 -->
+  <section class="mod" id="sec-progress">
+    <h2><span class="no">1.</span>공정관리</h2>
+    <div class="kpis" id="kpi-progress"></div>
+    <div class="grid2">
+      <div class="card">
+        <h3>누계 공정률 S-Curve</h3>
+        <div class="desc">월말 기준 계획 대비 실적 누계 공정률 (%)</div>
+        <div class="legend"><span><i class="line" style="background:var(--series-1)"></i>계획</span><span><i class="line" style="background:var(--series-2)"></i>실적</span></div>
+        <div class="chart" id="ch-scurve"></div>
+        <details class="tv"><summary>표로 보기</summary><div class="tbl-wrap" id="tb-scurve"></div></details>
+      </div>
+      <div class="card">
+        <h3>주요 마일스톤</h3>
+        <div class="desc">계획일 대비 실적일, 지연일수 (일)</div>
+        <div class="tbl-wrap" id="tb-milestone"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 원가관리 -->
+  <section class="mod" id="sec-cost">
+    <h2><span class="no">2.</span>원가관리</h2>
+    <div class="kpis" id="kpi-cost"></div>
+    <div class="grid2">
+      <div class="card">
+        <h3>월별 기성금액</h3>
+        <div class="desc">금회 기성금액 (백만원)</div>
+        <div class="chart" id="ch-billing"></div>
+        <details class="tv"><summary>표로 보기</summary><div class="tbl-wrap" id="tb-billing"></div></details>
+      </div>
+      <div class="card">
+        <h3>공종별 실행 집행률</h3>
+        <div class="desc">투입원가 ÷ 실행예산 (%), 100 % 기준선 표시</div>
+        <div class="chart" id="ch-trades"></div>
+        <details class="tv"><summary>표로 보기</summary><div class="tbl-wrap" id="tb-trades"></div></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 품질관리 -->
+  <section class="mod" id="sec-quality">
+    <h2><span class="no">3.</span>품질관리</h2>
+    <div class="kpis" id="kpi-quality"></div>
+    <div class="grid2">
+      <div class="card">
+        <h3>월별 품질시험 실시 현황</h3>
+        <div class="desc">합격·불합격 건수 (건)</div>
+        <div class="legend"><span><i style="background:var(--series-1)"></i>합격</span><span><i style="background:var(--series-2)"></i>불합격</span></div>
+        <div class="chart" id="ch-tests"></div>
+        <details class="tv"><summary>표로 보기</summary><div class="tbl-wrap" id="tb-tests"></div></details>
+      </div>
+      <div class="card">
+        <h3>시험종목별 누계</h3>
+        <div class="desc">판정기준: 품질관리계획서 및 해당 KCS 적용</div>
+        <div class="tbl-wrap" id="tb-testitems"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:10px">
+      <h3>부적합(NCR) 발생·조치 현황</h3>
+      <div class="desc">최근 발생순</div>
+      <div class="tbl-wrap" id="tb-ncr"></div>
+    </div>
+  </section>
+
+  <!-- 4. 안전관리 -->
+  <section class="mod" id="sec-safety">
+    <h2><span class="no">4.</span>안전관리</h2>
+    <div class="kpis" id="kpi-safety"></div>
+    <div class="grid2">
+      <div class="card">
+        <h3>월별 출역인원</h3>
+        <div class="desc">연인원 (명)</div>
+        <div class="chart" id="ch-workers"></div>
+        <details class="tv"><summary>표로 보기</summary><div class="tbl-wrap" id="tb-workers"></div></details>
+      </div>
+      <div class="card">
+        <h3>안전점검 지적사항</h3>
+        <div class="desc">최근 지적순</div>
+        <div class="tbl-wrap" id="tb-findings"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <b>산정 기준</b>
+    <ol>
+      <li>공정 차이(%p) = 실적 누계 공정률 − 계획 누계 공정률 (최종 실적월 기준)</li>
+      <li>EVM: BAC = 실행예산, PV = BAC × 계획 공정률, EV = BAC × 실적 공정률, AC = 실투입원가 누계 / SPI = EV ÷ PV, CPI = EV ÷ AC</li>
+      <li>상태 판정(정상·주의·경고)은 data/data.js 의 <code>thresholds</code> 에 정의한 현장 내부 관리기준이며 법정 기준이 아님</li>
+      <li>품질시험 판정기준은 건설공사 품질관리 업무지침 및 해당 공종 KCS에 따름 (대시보드는 건수 집계만 수행)</li>
+    </ol>
+  </footer>
+</div>
+<div id="tip"></div>
+
+<script src="data/data.js"></script>
+<script>
+(function () {
+  "use strict";
+  const D = window.DASHBOARD_DATA;
+  const $ = (id) => document.getElementById(id);
+  const T = D.thresholds;
+  const SVGNS = "http://www.w3.org/2000/svg";
+
+  /* ---------- 포맷 ---------- */
+  const fmtInt = (n) => Math.round(n).toLocaleString("ko-KR");
+  const fmtWon = (n) => fmtInt(n) + "원";
+  const fmtEok = (n) => (n / 1e8).toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtPct = (n, d = 1) => n.toFixed(d);
+  const fmtMonth = (m) => { const [y, mo] = m.split("-"); return `${y.slice(2)}.${mo}`; };
+  const parseDate = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const dayDiff = (a, b) => Math.round((b - a) / 86400000);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const badge = (cls, text) => `<span class="badge ${cls}">${esc(text)}</span>`;
+  // 값이 낮을수록 나쁜 지표 (SPI, CPI, 공정차이)
+  const judgeLow = (v, warn, crit) => v <= crit ? ["crit", "경고"] : v <= warn ? ["warn", "주의"] : ["good", "정상"];
+  // 값이 높을수록 나쁜 지표 (집행률)
+  const judgeHigh = (v, warn, crit) => v >= crit ? ["crit", "경고"] : v >= warn ? ["warn", "주의"] : ["good", "정상"];
+
+  const tile = (label, value, unit, sub) =>
+    `<div class="tile"><div class="label">${esc(label)}</div><div class="value num">${value}${unit ? `<small>${esc(unit)}</small>` : ""}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>`;
+
+  const table = (head, rows, rightCols = []) =>
+    `<table><thead><tr>${head.map((h, i) => `<th${rightCols.includes(i) ? ' class="r"' : ""}>${esc(h)}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map((r) => `<tr>${r.map((c, i) => `<td class="${rightCols.includes(i) ? "r num" : ""}">${c}</td>`).join("")}</tr>`).join("") +
+    `</tbody></table>`;
+
+  /* ---------- 툴팁 ---------- */
+  const tip = $("tip");
+  function showTip(evt, title, rows) {
+    tip.innerHTML = `<div class="t">${esc(title)}</div>` + rows.map(([k, v, c]) =>
+      `<div class="r"><span>${c ? `<i class="k" style="background:${c}"></i>` : ""}${esc(k)}</span><span class="num">${esc(v)}</span></div>`).join("");
+    tip.style.display = "block";
+    const pad = 12, w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = evt.clientX + pad, y = evt.clientY + pad;
+    if (x + w > window.innerWidth - 8) x = evt.clientX - w - pad;
+    if (y + h > window.innerHeight - 8) y = evt.clientY - h - pad;
+    tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px";
+  }
+  const hideTip = () => { tip.style.display = "none"; };
+
+  /* ---------- SVG 유틸 ---------- */
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function niceMax(v) {
+    if (v <= 0) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(v)));
+    const n = v / p;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+  }
+  // 상단만 둥근 막대 경로 (기준선 쪽은 직각)
+  function barPath(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h);
+    if (h <= 0) return "";
+    return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+  }
+  // 오른쪽 끝만 둥근 가로 막대
+  function hbarPath(x, y, w, h, r) {
+    r = Math.min(r, h / 2, w);
+    if (w <= 0) return "";
+    return `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h - r}Q${x + w},${y + h} ${x + w - r},${y + h}H${x}Z`;
+  }
+  function frame(container, height, m) {
+    container.innerHTML = "";
+    const W = Math.max(280, container.clientWidth);
+    const svg = el("svg", { viewBox: `0 0 ${W} ${height}`, height, role: "img" }, null);
+    container.appendChild(svg);
+    return { svg, W, H: height, iw: W - m.l - m.r, ih: height - m.t - m.b, m };
+  }
+  function yAxis(f, max, ticks, fmt) {
+    const g = el("g", {}, f.svg);
+    for (let i = 0; i <= ticks; i++) {
+      const v = (max / ticks) * i, y = f.m.t + f.ih - (v / max) * f.ih;
+      el("line", { x1: f.m.l, x2: f.m.l + f.iw, y1: y, y2: y, stroke: "var(--grid)", "stroke-width": 1 }, g);
+      const t = el("text", { x: f.m.l - 6, y: y + 4, "text-anchor": "end", "font-size": 11, fill: "var(--text-muted)" }, g);
+      t.textContent = fmt(v);
+    }
+  }
+  function xLabels(f, labels, xOf, every) {
+    labels.forEach((lb, i) => {
+      if (i % every !== 0 && i !== labels.length - 1) return;
+      const t = el("text", { x: xOf(i), y: f.H - 6, "text-anchor": "middle", "font-size": 11, fill: "var(--text-muted)" }, f.svg);
+      t.textContent = lb;
+    });
+  }
+
+  /* ---------- 차트: 꺾은선 (S-Curve) ---------- */
+  function lineChart(container, labels, series, opt) {
+    const f = frame(container, 260, { t: 12, r: 44, b: 26, l: 36 });
+    const max = opt.max;
+    const n = labels.length;
+    const xOf = (i) => f.m.l + (n === 1 ? f.iw / 2 : (i / (n - 1)) * f.iw);
+    const yOf = (v) => f.m.t + f.ih - (v / max) * f.ih;
+    yAxis(f, max, 4, (v) => fmtInt(v));
+    xLabels(f, labels.map(fmtMonth), xOf, Math.ceil(n / (f.iw / 52)));
+
+    series.forEach((s) => {
+      const pts = s.values.map((v, i) => (v == null ? null : [xOf(i), yOf(v)])).filter(Boolean);
+      el("path", { d: "M" + pts.map((p) => p.join(",")).join("L"), fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, f.svg);
+      const last = pts[pts.length - 1];
+      el("circle", { cx: last[0], cy: last[1], r: 4, fill: s.color, stroke: "var(--surface-1)", "stroke-width": 2 }, f.svg);
+      s._last = last; s._lastVal = s.values.filter((v) => v != null).slice(-1)[0];
+    });
+    // 끝점 라벨 (겹치면 생략 → 범례·툴팁이 대체)
+    const ends = series.map((s) => s._last[1]);
+    const collide = series.length > 1 && Math.abs(ends[0] - ends[1]) < 14 && Math.abs(series[0]._last[0] - series[1]._last[0]) < 40;
+    series.forEach((s, k) => {
+      if (collide && k > 0) return;
+      const t = el("text", { x: s._last[0] + 8, y: s._last[1] + 4, "font-size": 11, "font-weight": 600, fill: "var(--text-primary)" }, f.svg);
+      t.textContent = fmtPct(s._lastVal) + "%";
+    });
+
+    // 크로스헤어 + 툴팁
+    const cross = el("line", { y1: f.m.t, y2: f.m.t + f.ih, stroke: "var(--text-muted)", "stroke-width": 1, visibility: "hidden" }, f.svg);
+    const dots = series.map((s) => el("circle", { r: 4, fill: s.color, stroke: "var(--surface-1)", "stroke-width": 2, visibility: "hidden" }, f.svg));
+    const hit = el("rect", { x: f.m.l, y: f.m.t, width: f.iw, height: f.ih, fill: "transparent" }, f.svg);
+    const move = (evt) => {
+      const r = f.svg.getBoundingClientRect();
+      const px = ((evt.clientX - r.left) / r.width) * f.W;
+      const i = Math.max(0, Math.min(n - 1, Math.round(((px - f.m.l) / f.iw) * (n - 1))));
+      cross.setAttribute("x1", xOf(i)); cross.setAttribute("x2", xOf(i)); cross.setAttribute("visibility", "visible");
+      series.forEach((s, k) => {
+        const v = s.values[i];
+        if (v == null) { dots[k].setAttribute("visibility", "hidden"); return; }
+        dots[k].setAttribute("cx", xOf(i)); dots[k].setAttribute("cy", yOf(v)); dots[k].setAttribute("visibility", "visible");
+      });
+      showTip(evt, labels[i], opt.tipRows(i));
+    };
+    hit.addEventListener("pointermove", move);
+    hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); dots.forEach((d) => d.setAttribute("visibility", "hidden")); hideTip(); });
+  }
+
+  /* ---------- 차트: 세로 막대 (단일/누적) ---------- */
+  function columnChart(container, labels, stacks, opt) {
+    const f = frame(container, 240, { t: 18, r: 8, b: 26, l: opt.yw || 40 });
+    const n = labels.length;
+    const totals = labels.map((_, i) => stacks.reduce((a, s) => a + s.values[i], 0));
+    // 눈금 간격을 깔끔한 수(1·2·2.5·5 × 10ⁿ)로 맞춰 4~5개 눈금 생성
+    const step = niceMax(Math.max(...totals) / 4);
+    const ticks = Math.ceil(Math.max(...totals) / step);
+    const max = step * ticks;
+    const band = f.iw / n, bw = Math.min(24, band * 0.6);
+    const xOf = (i) => f.m.l + band * i + band / 2;
+    const yOf = (v) => f.m.t + f.ih - (v / max) * f.ih;
+    yAxis(f, max, ticks, opt.yfmt || fmtInt);
+    xLabels(f, labels.map(fmtMonth), xOf, Math.ceil(n / (f.iw / 44)));
+    labels.forEach((lb, i) => {
+      let base = 0;
+      const top = stacks.length - 1 - [...stacks].reverse().findIndex((s) => s.values[i] > 0);
+      stacks.forEach((s, k) => {
+        const v = s.values[i]; if (v <= 0) return;
+        const y0 = yOf(base), y1 = yOf(base + v);
+        const gap = k > 0 ? 2 : 0; // 누적 세그먼트 사이 2px 표면 간격
+        const h = y0 - y1 - gap;
+        if (h > 0) {
+          const d = k === top ? barPath(xOf(i) - bw / 2, y1, bw, h, 4) : `M${xOf(i) - bw / 2},${y1}h${bw}v${h}h${-bw}Z`;
+          el("path", { d, fill: s.color }, f.svg);
+        }
+        base += v;
+      });
+      // 히트 영역 (막대보다 넓게)
+      const hit = el("rect", { x: f.m.l + band * i, y: f.m.t, width: band, height: f.ih, fill: "transparent" }, f.svg);
+      hit.addEventListener("pointermove", (evt) => showTip(evt, lb, opt.tipRows(i)));
+      hit.addEventListener("pointerleave", hideTip);
+    });
+    // 최대값만 직접 라벨
+    const iMax = totals.indexOf(Math.max(...totals));
+    const t = el("text", { x: xOf(iMax), y: yOf(totals[iMax]) - 5, "text-anchor": "middle", "font-size": 11, "font-weight": 600, fill: "var(--text-primary)" }, f.svg);
+    t.textContent = (opt.labelFmt || fmtInt)(totals[iMax]);
+  }
+
+  /* ---------- 차트: 가로 막대 (공종별 집행률) ---------- */
+  function hbarChart(container, rows, opt) {
+    const rowH = 30;
+    const f = frame(container, rows.length * rowH + 28, { t: 6, r: 52, b: 22, l: 110 });
+    const max = Math.max(110, niceMax(Math.max(...rows.map((r) => r.value))));
+    const xOf = (v) => f.m.l + (v / max) * f.iw;
+    [0, 25, 50, 75, 100].forEach((v) => {
+      el("line", { x1: xOf(v), x2: xOf(v), y1: f.m.t, y2: f.m.t + f.ih, stroke: v === 100 ? "var(--text-muted)" : "var(--grid)", "stroke-width": 1 }, f.svg);
+      const t = el("text", { x: xOf(v), y: f.H - 6, "text-anchor": "middle", "font-size": 11, fill: "var(--text-muted)" }, f.svg);
+      t.textContent = v + "%";
+    });
+    rows.forEach((r, i) => {
+      const y = f.m.t + i * rowH + (rowH - 14) / 2;
+      const lb = el("text", { x: f.m.l - 8, y: y + 11, "text-anchor": "end", "font-size": 12, fill: "var(--text-secondary)" }, f.svg);
+      lb.textContent = r.name;
+      el("path", { d: hbarPath(f.m.l, y, xOf(r.value) - f.m.l, 14, 4), fill: "var(--series-1)" }, f.svg);
+      const v = el("text", { x: xOf(r.value) + 6, y: y + 11, "font-size": 11, "font-weight": 600, fill: "var(--text-primary)" }, f.svg);
+      v.textContent = fmtPct(r.value) + "%";
+      const hit = el("rect", { x: 0, y: f.m.t + i * rowH, width: f.W, height: rowH, fill: "transparent" }, f.svg);
+      hit.addEventListener("pointermove", (evt) => showTip(evt, r.name, opt.tipRows(i)));
+      hit.addEventListener("pointerleave", hideTip);
+    });
+  }
+
+  /* =====================================================================
+   * 계산
+   * ===================================================================== */
+  const P = D.project;
+  const start = parseDate(P.startDate), end = parseDate(P.endDate);
+  const base = P.baseDate ? parseDate(P.baseDate) : new Date(new Date().setHours(0, 0, 0, 0));
+  const totalDays = dayDiff(start, end) + 1;
+  const elapsed = Math.min(totalDays, Math.max(0, dayDiff(start, base) + 1));
+  const remain = Math.max(0, dayDiff(base, end));
+  const timeRate = (elapsed / totalDays) * 100;
+
+  const prog = D.progress;
+  const lastIdx = prog.map((p) => p.actual != null).lastIndexOf(true);
+  const lastP = prog[lastIdx];
+  const gap = lastP.actual - lastP.plan;
+
+  const BAC = D.cost.executionBudget;
+  const PV = BAC * lastP.plan / 100, EV = BAC * lastP.actual / 100, AC = lastP.costCum;
+  const SPI = EV / PV, CPI = EV / AC;
+
+  const bills = D.cost.billings;
+  const billCum = bills.reduce((a, b) => a + b.amount, 0);
+  const billRate = (billCum / P.contractAmount) * 100;
+
+  /* ---------- 헤더 ---------- */
+  if (D.SAMPLE) $("banner").hidden = false;
+  $("pj-name").textContent = P.name + " 현장 대시보드";
+  $("pj-meta").innerHTML = `도급액 <b class="num">${fmtWon(P.contractAmount)}</b> · 공사기간 ${P.startDate} ~ ${P.endDate} · 기준일 ${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(base.getDate()).padStart(2, "0")}`;
+  $("timeline").innerHTML = `
+    <div class="row"><span>공기 경과율 <b class="num">${fmtPct(timeRate)}%</b></span><span class="num">경과 <b>${fmtInt(elapsed)}</b>일 / 총 <b>${fmtInt(totalDays)}</b>일 · 잔여 <b>${fmtInt(remain)}</b>일</span></div>
+    <div class="track"><div class="fill" style="width:${timeRate.toFixed(2)}%"></div></div>
+    <div class="row"><span>착공 ${P.startDate}</span><span>준공예정 ${P.endDate}</span></div>`;
+
+  /* ---------- 1. 공정관리 ---------- */
+  const [gc, gt] = judgeLow(gap, T.progressGapWarn, T.progressGapCrit);
+  const [sc, st] = judgeLow(SPI, T.spiWarn, T.spiCrit);
+  $("kpi-progress").innerHTML =
+    tile("계획 공정률", fmtPct(lastP.plan), "%", `${lastP.month} 월말 기준`) +
+    tile("실적 공정률", fmtPct(lastP.actual), "%", `${lastP.month} 월말 기준`) +
+    tile("공정 차이", (gap > 0 ? "+" : "") + fmtPct(gap), "%p", badge(gc, gt)) +
+    tile("SPI (공정성과지수)", SPI.toFixed(3), "", badge(sc, st) + ` <span>기준 ${T.spiWarn} 이상</span>`) +
+    tile("공기 경과율", fmtPct(timeRate), "%", `잔여 ${fmtInt(remain)}일`);
+
+  const sTip = (i) => {
+    const p = prog[i], r = [["계획", fmtPct(p.plan) + "%", "var(--series-1)"]];
+    if (p.actual != null) { r.push(["실적", fmtPct(p.actual) + "%", "var(--series-2)"]); r.push(["차이", (p.actual - p.plan).toFixed(1) + "%p"]); }
+    return r;
+  };
+  const drawS = () => lineChart($("ch-scurve"), prog.map((p) => p.month), [
+    { values: prog.map((p) => p.plan), color: "var(--series-1)" },
+    { values: prog.map((p) => p.actual ?? null), color: "var(--series-2)" }
+  ], { max: 100, tipRows: sTip });
+  $("tb-scurve").innerHTML = table(["월", "계획(%)", "실적(%)", "차이(%p)"],
+    prog.map((p) => [p.month, fmtPct(p.plan), p.actual != null ? fmtPct(p.actual) : "-", p.actual != null ? (p.actual - p.plan).toFixed(1) : "-"]), [1, 2, 3]);
+
+  const msMap = { done: ["good", "완료"], ongoing: ["info", "진행"], planned: ["muted", "예정"], delayed: ["crit", "지연"] };
+  $("tb-milestone").innerHTML = table(["마일스톤", "계획일", "실적일", "지연(일)", "상태"],
+    D.milestones.map((m) => {
+      let delay = "-";
+      if (m.actual) delay = dayDiff(parseDate(m.plan), parseDate(m.actual));
+      else if (base > parseDate(m.plan)) delay = dayDiff(parseDate(m.plan), base);
+      const [c, t] = msMap[m.status] || ["muted", m.status];
+      return [esc(m.name), m.plan, m.actual || "-", typeof delay === "number" ? (delay > 0 ? "+" : "") + delay : delay, badge(c, t)];
+    }), [3]);
+
+  /* ---------- 2. 원가관리 ---------- */
+  const [cc, ct] = judgeLow(CPI, T.cpiWarn, T.cpiCrit);
+  $("kpi-cost").innerHTML =
+    tile("기성 누계", fmtEok(billCum), "억원", `${bills.length}회차 · ${fmtWon(billCum)}`) +
+    tile("기성률", fmtPct(billRate), "%", "기성 누계 ÷ 도급액") +
+    tile("실행예산 (BAC)", fmtEok(BAC), "억원", `실행률 ${fmtPct(BAC / P.contractAmount * 100)}% (도급 대비)`) +
+    tile("실투입원가 (AC)", fmtEok(AC), "억원", `${lastP.month} 누계 · EV ${fmtEok(EV)}억원`) +
+    tile("CPI (원가성과지수)", CPI.toFixed(3), "", badge(cc, ct) + ` <span>기준 ${T.cpiWarn} 이상</span>`);
+
+  let cum = 0;
+  const billRows = bills.map((b) => { cum += b.amount; return { ...b, cum }; });
+  const drawBill = () => columnChart($("ch-billing"), bills.map((b) => b.month),
+    [{ values: bills.map((b) => b.amount / 1e6), color: "var(--series-1)" }],
+    { yw: 40, labelFmt: (v) => fmtInt(v), tipRows: (i) => [["회차", billRows[i].no + "회"], ["금회 기성", fmtWon(billRows[i].amount)], ["기성 누계", fmtWon(billRows[i].cum)], ["누계 기성률", fmtPct(billRows[i].cum / P.contractAmount * 100) + "%"]] });
+  $("tb-billing").innerHTML = table(["회차", "대상월", "금회 기성(원)", "누계(원)", "누계 기성률(%)"],
+    billRows.map((b) => [b.no, b.month, fmtInt(b.amount), fmtInt(b.cum), fmtPct(b.cum / P.contractAmount * 100)]), [0, 2, 3, 4]);
+
+  const trades = D.cost.trades.map((t) => ({ ...t, value: (t.spent / t.budget) * 100 }));
+  const drawTrades = () => hbarChart($("ch-trades"), trades, {
+    tipRows: (i) => [["실행예산", fmtWon(trades[i].budget)], ["투입원가", fmtWon(trades[i].spent)], ["잔여", fmtWon(trades[i].budget - trades[i].spent)], ["집행률", fmtPct(trades[i].value) + "%"]]
+  });
+  $("tb-trades").innerHTML = table(["공종", "실행예산(원)", "투입원가(원)", "집행률(%)", "상태"],
+    trades.map((t) => { const [c, s] = judgeHigh(t.value, T.execRateWarn, T.execRateCrit); return [esc(t.name), fmtInt(t.budget), fmtInt(t.spent), fmtPct(t.value), badge(c, s)]; }), [1, 2, 3]);
+
+  /* ---------- 3. 품질관리 ---------- */
+  const Q = D.quality;
+  const tItems = Q.testItems;
+  const tTotal = tItems.reduce((a, t) => a + t.total, 0), tFail = tItems.reduce((a, t) => a + t.fail, 0);
+  const ncrOpen = Q.ncr.filter((n) => n.status === "open").length;
+  const lastQ = Q.monthlyTests[Q.monthlyTests.length - 1];
+  $("kpi-quality").innerHTML =
+    tile("품질시험 누계", fmtInt(tTotal), "건", `불합격 ${fmtInt(tFail)}건`) +
+    tile("누계 불합격률", fmtPct(tTotal ? tFail / tTotal * 100 : 0, 2), "%", "불합격 ÷ 시험 건수") +
+    tile(`${lastQ.month} 시험`, fmtInt(lastQ.pass + lastQ.fail), "건", `불합격 ${lastQ.fail}건`) +
+    tile("NCR 미조치", fmtInt(ncrOpen), "건", ncrOpen > 0 ? badge("warn", "조치 필요") : badge("good", "전건 조치"));
+
+  const mt = Q.monthlyTests;
+  const drawTests = () => columnChart($("ch-tests"), mt.map((m) => m.month), [
+    { values: mt.map((m) => m.pass), color: "var(--series-1)" },
+    { values: mt.map((m) => m.fail), color: "var(--series-2)" }
+  ], { yw: 32, tipRows: (i) => [["합격", mt[i].pass + "건", "var(--series-1)"], ["불합격", mt[i].fail + "건", "var(--series-2)"], ["계", mt[i].pass + mt[i].fail + "건"]] });
+  $("tb-tests").innerHTML = table(["월", "합격(건)", "불합격(건)", "계(건)"], mt.map((m) => [m.month, m.pass, m.fail, m.pass + m.fail]), [1, 2, 3]);
+  $("tb-testitems").innerHTML = table(["시험종목", "시험(건)", "불합격(건)", "불합격률(%)"],
+    tItems.map((t) => [esc(t.item), fmtInt(t.total), fmtInt(t.fail), fmtPct(t.total ? t.fail / t.total * 100 : 0, 2)]), [1, 2, 3]);
+  $("tb-ncr").innerHTML = table(["번호", "발생일", "공종", "내용", "경과(일)", "상태"],
+    Q.ncr.map((n) => [n.no, n.date, esc(n.trade), esc(n.title), n.status === "open" ? dayDiff(parseDate(n.date), base) : "-",
+      n.status === "open" ? badge("warn", "미조치") : badge("good", "조치완료")]), [4]);
+
+  /* ---------- 4. 안전관리 ---------- */
+  const S = D.safety;
+  const afDays = Math.max(0, dayDiff(parseDate(S.accidentFreeSince), base) + 1);
+  const ra = S.riskAssessment, raRate = ra.total ? ra.done / ra.total * 100 : 0;
+  const sm = S.monthly, lastS = sm[sm.length - 1];
+  const tbmRate = lastS.workDays ? lastS.tbmDays / lastS.workDays * 100 : 0;
+  const fOpen = S.findings.filter((x) => x.status === "open").length;
+  $("kpi-safety").innerHTML =
+    tile("무재해 일수", fmtInt(afDays), "일", `기산일 ${S.accidentFreeSince}`) +
+    tile("위험성평가 조치율", fmtPct(raRate), "%", `${fmtInt(ra.done)} / ${fmtInt(ra.total)}건`) +
+    tile(`${lastS.month} TBM 실시율`, fmtPct(tbmRate), "%", `${lastS.tbmDays} / ${lastS.workDays} 작업일`) +
+    tile(`${lastS.month} 출역 연인원`, fmtInt(lastS.workers), "명", `일평균 ${fmtInt(lastS.workers / lastS.workDays)}명`) +
+    tile("지적사항 미조치", fmtInt(fOpen), "건", fOpen > 0 ? badge("warn", "조치 필요") : badge("good", "전건 조치"));
+
+  const drawWorkers = () => columnChart($("ch-workers"), sm.map((m) => m.month),
+    [{ values: sm.map((m) => m.workers), color: "var(--series-1)" }],
+    { yw: 40, tipRows: (i) => [["출역 연인원", fmtInt(sm[i].workers) + "명"], ["작업일", sm[i].workDays + "일"], ["일평균", fmtInt(sm[i].workers / sm[i].workDays) + "명"], ["TBM 실시", sm[i].tbmDays + "일"]] });
+  $("tb-workers").innerHTML = table(["월", "연인원(명)", "작업일(일)", "일평균(명)", "TBM(일)"],
+    sm.map((m) => [m.month, fmtInt(m.workers), m.workDays, fmtInt(m.workers / m.workDays), m.tbmDays]), [1, 2, 3, 4]);
+  $("tb-findings").innerHTML = table(["지적일", "구분", "내용", "상태"],
+    S.findings.map((x) => [x.date, esc(x.source), esc(x.title), x.status === "open" ? badge("warn", "미조치") : badge("good", "조치완료")]));
+
+  /* ---------- 렌더 & 리사이즈 ---------- */
+  const drawAll = () => { drawS(); drawBill(); drawTrades(); drawTests(); drawWorkers(); };
+  drawAll();
+  let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(drawAll, 120); });
+
+  /* ---------- 테마 전환 ---------- */
+  const root = document.documentElement;
+  try { const s = localStorage.getItem("dash-theme"); if (s) root.dataset.theme = s; } catch (e) {}
+  $("themeBtn").addEventListener("click", () => {
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("dash-theme", root.dataset.theme); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>
