@@ -57,6 +57,7 @@
   --banner-text: #f5dc9a;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   background: var(--bg);
@@ -161,6 +162,7 @@ footer ol { margin: 4px 0 0; padding-left: 18px; }
 tfoot td { font-weight: 600; border-top: 1px solid var(--text-muted); border-bottom: none; }
 tr.em td { font-weight: 600; background: var(--surface-2); }
 .banner b { font-weight: 700; }
+.empty { border: 1px dashed var(--border); border-radius: 8px; padding: 28px 12px; text-align: center; color: var(--text-muted); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -242,7 +244,7 @@ tr.em td { font-weight: 600; background: var(--surface-2); }
       <div class="card">
         <h3>월별 품질시험 실시 현황</h3>
         <div class="desc">합격·불합격 건수 (건)</div>
-        <div class="legend"><span><i style="background:var(--series-1)"></i>합격</span><span><i style="background:var(--series-2)"></i>불합격</span></div>
+        <div class="legend" id="lg-tests"><span><i style="background:var(--series-1)"></i>합격</span><span><i style="background:var(--series-2)"></i>불합격</span></div>
         <div class="chart" id="ch-tests"></div>
         <details class="tv"><summary>표로 보기</summary><div class="tbl-wrap" id="tb-tests"></div></details>
       </div>
@@ -517,9 +519,10 @@ tr.em td { font-weight: 600; background: var(--surface-2); }
   const SPI = lastA.v / planAtA;
 
   /* ---------- 헤더 ---------- */
-  const qS = ST.quality.SAMPLE, sS = ST.safety.SAMPLE;
-  $("banner").innerHTML = `데이터 출처 — 공정: ${esc(SC.title)} (작성 ${SC.writtenDate}) · 원가: 제${BL.round}회 기성내역서 (${esc(BL.dateText)})` +
-    (qS || sS ? ` · <b>${[qS ? "품질" : "", sS ? "안전" : ""].filter(Boolean).join("·")}관리는 샘플 데이터</b>` : "");
+  const isEmpty = (o) => !o || Object.values(o).every((v) => v == null || v === "" || (Array.isArray(v) && !v.length));
+  const qPending = isEmpty(ST.quality), sPending = isEmpty(ST.safety);
+  $("banner").innerHTML = `데이터 출처 — 공정: ${esc(SC.title)} (작성 ${SC.writtenDate}) · 원가: 제${BL.round}회 기성내역서 (${esc(BL.dateText.replace(/\s+일$/, ""))})` +
+    (!qPending && !sPending ? "" : ` · <b>${[qPending ? "품질" : "", sPending ? "안전" : ""].filter(Boolean).join("·")}관리 자료 미입력</b>`);
   $("pj-name").textContent = P.name;
   $("pj-meta").innerHTML = `${esc(P.location)} · 발주 ${esc(P.client)} · 시공 ${esc(P.contractor)}<br>` +
     `도급액 <b class="num">${fmtWon(BL.contractAmount)}</b> · 공사기간 ${P.startDate} ~ ${P.endDate} · 기준일 ${iso(base)}`;
@@ -618,50 +621,62 @@ tr.em td { font-weight: 600; background: var(--surface-2); }
     BL.majorWorks.map((m) => [esc(m.division || ""), esc(m.trade || ""), esc(m.desc), fmtInt(m.amount), esc(m.note)]), [3],
     ["", "", "<b>직접공사비 계</b>", fmtInt(BL.majorWorks.reduce((a, m) => a + m.amount, 0)), ""]);
 
-  /* ---------- 3. 품질관리 ---------- */
-  const Q = ST.quality;
-  $("src-quality").innerHTML = srcTag(Q.SAMPLE, "");
-  const tItems = Q.testItems;
-  const tTotal = tItems.reduce((a, t) => a + t.total, 0), tFail = tItems.reduce((a, t) => a + t.fail, 0);
-  const ncrOpen = Q.ncr.filter((n) => n.status === "open").length;
-  const mt = Q.monthlyTests, lastQ = mt[mt.length - 1];
-  $("kpi-quality").innerHTML =
-    tile("품질시험 누계", fmtInt(tTotal), "건", `불합격 ${fmtInt(tFail)}건`) +
-    tile("누계 불합격률", fmtPct(tTotal ? tFail / tTotal * 100 : 0, 2), "%", "불합격 ÷ 시험 건수") +
-    tile(`${lastQ.month} 시험`, fmtInt(lastQ.pass + lastQ.fail), "건", `불합격 ${lastQ.fail}건`) +
-    tile("NCR 미조치", fmtInt(ncrOpen), "건", ncrOpen > 0 ? badge("warn", "조치 필요") : badge("good", "전건 조치"));
-  const drawTests = () => columnChart($("ch-tests"), mt.map((m) => m.month), [
+  /* ---------- 3·4. 품질·안전 (자료 미입력 시 빈 상태 표시) ---------- */
+  const emptyBox = (key) => `<div class="empty">자료 미입력 — data/site.js 의 <code>${key}</code> 에 입력</div>`;
+  const pendingTag = '<span class="tag">자료 미입력</span>';
+  const noop = () => {};
+
+  /* 3. 품질관리 */
+  const Q = ST.quality || {};
+  const mt = Q.monthlyTests || [], tItems = Q.testItems || [], ncr = Q.ncr || [];
+  const qHas = mt.length || tItems.length || ncr.length;
+  $("src-quality").innerHTML = qHas ? srcTag(false, "현장 입력") : pendingTag;
+  {
+    const tTotal = tItems.reduce((a, t) => a + t.total, 0), tFail = tItems.reduce((a, t) => a + t.fail, 0);
+    const ncrOpen = ncr.filter((n) => n.status === "open").length;
+    const lastQ = mt[mt.length - 1];
+    $("kpi-quality").innerHTML =
+      tile("품질시험 누계", tItems.length ? fmtInt(tTotal) : "-", "건", tItems.length ? `불합격 ${fmtInt(tFail)}건` : "미입력") +
+      tile("누계 불합격률", tItems.length && tTotal ? fmtPct(tFail / tTotal * 100, 2) : "-", "%", "불합격 ÷ 시험 건수") +
+      tile(lastQ ? `${lastQ.month} 시험` : "최근월 시험", lastQ ? fmtInt(lastQ.pass + lastQ.fail) : "-", "건", lastQ ? `불합격 ${lastQ.fail}건` : "미입력") +
+      tile("NCR 미조치", ncr.length ? fmtInt(ncrOpen) : "-", "건", !ncr.length ? "미입력" : ncrOpen > 0 ? badge("warn", "조치 필요") : badge("good", "전건 조치"));
+  }
+  const drawTests = mt.length ? () => columnChart($("ch-tests"), mt.map((m) => m.month), [
     { values: mt.map((m) => m.pass), color: "var(--series-1)" },
     { values: mt.map((m) => m.fail), color: "var(--series-2)" }
-  ], { yw: 32, tipRows: (i) => [["합격", mt[i].pass + "건", "var(--series-1)"], ["불합격", mt[i].fail + "건", "var(--series-2)"], ["계", mt[i].pass + mt[i].fail + "건"]] });
-  $("tb-tests").innerHTML = table(["월", "합격(건)", "불합격(건)", "계(건)"], mt.map((m) => [m.month, m.pass, m.fail, m.pass + m.fail]), [1, 2, 3]);
-  $("tb-testitems").innerHTML = table(["시험종목", "시험(건)", "불합격(건)", "불합격률(%)"],
-    tItems.map((t) => [esc(t.item), fmtInt(t.total), fmtInt(t.fail), fmtPct(t.total ? t.fail / t.total * 100 : 0, 2)]), [1, 2, 3]);
-  $("tb-ncr").innerHTML = table(["번호", "발생일", "공종", "내용", "경과(일)", "상태"],
-    Q.ncr.map((n) => [n.no, n.date, esc(n.trade), esc(n.title), n.status === "open" ? dayDiff(parseDate(n.date), base) : "-",
-      n.status === "open" ? badge("warn", "미조치") : badge("good", "조치완료")]), [4]);
+  ], { yw: 32, tipRows: (i) => [["합격", mt[i].pass + "건", "var(--series-1)"], ["불합격", mt[i].fail + "건", "var(--series-2)"], ["계", mt[i].pass + mt[i].fail + "건"]] }) : noop;
+  if (!mt.length) { $("ch-tests").innerHTML = emptyBox("quality.monthlyTests"); $("tb-tests").closest("details").hidden = true; $("lg-tests").hidden = true; }
+  else $("tb-tests").innerHTML = table(["월", "합격(건)", "불합격(건)", "계(건)"], mt.map((m) => [m.month, m.pass, m.fail, m.pass + m.fail]), [1, 2, 3]);
+  $("tb-testitems").innerHTML = tItems.length ? table(["시험종목", "시험(건)", "불합격(건)", "불합격률(%)"],
+    tItems.map((t) => [esc(t.item), fmtInt(t.total), fmtInt(t.fail), fmtPct(t.total ? t.fail / t.total * 100 : 0, 2)]), [1, 2, 3]) : emptyBox("quality.testItems");
+  $("tb-ncr").innerHTML = ncr.length ? table(["번호", "발생일", "공종", "내용", "경과(일)", "상태"],
+    ncr.map((n) => [n.no, n.date, esc(n.trade), esc(n.title), n.status === "open" ? dayDiff(parseDate(n.date), base) : "-",
+      n.status === "open" ? badge("warn", "미조치") : badge("good", "조치완료")]), [4]) : emptyBox("quality.ncr");
 
-  /* ---------- 4. 안전관리 ---------- */
-  const S = ST.safety;
-  $("src-safety").innerHTML = srcTag(S.SAMPLE, "");
-  const afDays = Math.max(0, dayDiff(parseDate(S.accidentFreeSince), base) + 1);
-  const ra = S.riskAssessment, raRate = ra.total ? ra.done / ra.total * 100 : 0;
-  const sm = S.monthly, lastS = sm[sm.length - 1];
-  const tbmRate = lastS.workDays ? lastS.tbmDays / lastS.workDays * 100 : 0;
-  const fOpen = S.findings.filter((x) => x.status === "open").length;
-  $("kpi-safety").innerHTML =
-    tile("무재해 일수", fmtInt(afDays), "일", `기산일 ${S.accidentFreeSince}`) +
-    tile("위험성평가 조치율", fmtPct(raRate), "%", `${fmtInt(ra.done)} / ${fmtInt(ra.total)}건`) +
-    tile(`${lastS.month} TBM 실시율`, fmtPct(tbmRate), "%", `${lastS.tbmDays} / ${lastS.workDays} 작업일`) +
-    tile(`${lastS.month} 출역 연인원`, fmtInt(lastS.workers), "명", `일평균 ${fmtInt(lastS.workers / lastS.workDays)}명`) +
-    tile("지적사항 미조치", fmtInt(fOpen), "건", fOpen > 0 ? badge("warn", "조치 필요") : badge("good", "전건 조치"));
-  const drawWorkers = () => columnChart($("ch-workers"), sm.map((m) => m.month),
+  /* 4. 안전관리 */
+  const S = ST.safety || {};
+  const sm = S.monthly || [], fnd = S.findings || [], ra = S.riskAssessment;
+  const sHas = sm.length || fnd.length || ra || S.accidentFreeSince;
+  $("src-safety").innerHTML = sHas ? srcTag(false, "현장 입력") : pendingTag;
+  {
+    const afDays = S.accidentFreeSince ? Math.max(0, dayDiff(parseDate(S.accidentFreeSince), base) + 1) : null;
+    const lastS = sm[sm.length - 1];
+    const fOpen = fnd.filter((x) => x.status === "open").length;
+    $("kpi-safety").innerHTML =
+      tile("무재해 일수", afDays != null ? fmtInt(afDays) : "-", "일", S.accidentFreeSince ? `기산일 ${S.accidentFreeSince}` : "미입력") +
+      tile("위험성평가 조치율", ra && ra.total ? fmtPct(ra.done / ra.total * 100) : "-", "%", ra ? `${fmtInt(ra.done)} / ${fmtInt(ra.total)}건` : "미입력") +
+      tile(lastS ? `${lastS.month} TBM 실시율` : "TBM 실시율", lastS && lastS.workDays ? fmtPct(lastS.tbmDays / lastS.workDays * 100) : "-", "%", lastS ? `${lastS.tbmDays} / ${lastS.workDays} 작업일` : "미입력") +
+      tile(lastS ? `${lastS.month} 출역 연인원` : "출역 연인원", lastS ? fmtInt(lastS.workers) : "-", "명", lastS ? `일평균 ${fmtInt(lastS.workers / lastS.workDays)}명` : "미입력") +
+      tile("지적사항 미조치", fnd.length ? fmtInt(fOpen) : "-", "건", !fnd.length ? "미입력" : fOpen > 0 ? badge("warn", "조치 필요") : badge("good", "전건 조치"));
+  }
+  const drawWorkers = sm.length ? () => columnChart($("ch-workers"), sm.map((m) => m.month),
     [{ values: sm.map((m) => m.workers), color: "var(--series-1)" }],
-    { yw: 40, tipRows: (i) => [["출역 연인원", fmtInt(sm[i].workers) + "명"], ["작업일", sm[i].workDays + "일"], ["일평균", fmtInt(sm[i].workers / sm[i].workDays) + "명"], ["TBM 실시", sm[i].tbmDays + "일"]] });
-  $("tb-workers").innerHTML = table(["월", "연인원(명)", "작업일(일)", "일평균(명)", "TBM(일)"],
+    { yw: 40, tipRows: (i) => [["출역 연인원", fmtInt(sm[i].workers) + "명"], ["작업일", sm[i].workDays + "일"], ["일평균", fmtInt(sm[i].workers / sm[i].workDays) + "명"], ["TBM 실시", sm[i].tbmDays + "일"]] }) : noop;
+  if (!sm.length) { $("ch-workers").innerHTML = emptyBox("safety.monthly"); $("tb-workers").closest("details").hidden = true; }
+  else $("tb-workers").innerHTML = table(["월", "연인원(명)", "작업일(일)", "일평균(명)", "TBM(일)"],
     sm.map((m) => [m.month, fmtInt(m.workers), m.workDays, fmtInt(m.workers / m.workDays), m.tbmDays]), [1, 2, 3, 4]);
-  $("tb-findings").innerHTML = table(["지적일", "구분", "내용", "상태"],
-    S.findings.map((x) => [x.date, esc(x.source), esc(x.title), x.status === "open" ? badge("warn", "미조치") : badge("good", "조치완료")]));
+  $("tb-findings").innerHTML = fnd.length ? table(["지적일", "구분", "내용", "상태"],
+    fnd.map((x) => [x.date, esc(x.source), esc(x.title), x.status === "open" ? badge("warn", "미조치") : badge("good", "조치완료")])) : emptyBox("safety.findings");
 
   /* ---------- 렌더 & 리사이즈 ---------- */
   const drawAll = () => { drawS(); drawTrades(); drawAdv(); drawTests(); drawWorkers(); };
